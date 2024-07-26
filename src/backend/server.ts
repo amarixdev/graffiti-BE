@@ -11,8 +11,7 @@ class SocketIOServer {
   #app: express.Application;
   #server: http.Server;
   #io: Server;
-  #origin = "http://localhost:5173"
-
+  #origin = "http://localhost:5173";
 
   constructor(port: number) {
     this.#PORT = port;
@@ -33,13 +32,15 @@ class SocketIOServer {
     this.#app.get("/", (req, res) => {
       res.set({
         "Access-Control-Allow-Headers": "Content-Type, Authorization",
-        "Access-Control-Allow-Origin": this.#origin, // or the specific origin you want to give access to,
+        "Access-Control-Allow-Origin": this.#origin, 
         "Access-Control-Allow-Credentials": true,
       });
-      res.send("Hello");
+      res.send("Connected");
     });
-    const listeners = new SocketListers(this.#io);
-    listeners.clientConnection();
+    
+    //handleEvents 
+    const eventListeners = new SocketListers(this.#io);
+    eventListeners.clientConnection();
 
     this.#server.listen(this.#PORT, this.#HOSTNAME, () => {
       console.log(`server running on http://${this.#HOSTNAME}:${this.#PORT}`);

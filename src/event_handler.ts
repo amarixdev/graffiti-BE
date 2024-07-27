@@ -18,6 +18,7 @@ export default class EventHandler {
 
       this.#handleStroke(socket);
       this.#handleSave(socket);
+      this.#handleLoad(socket);
 
       socket.on("disconnect", () => {
         console.log("client disconnected");
@@ -42,6 +43,14 @@ export default class EventHandler {
       if (data.length > 0) {
         new Database(data).insert();
       }
+    });
+  }
+
+  #handleLoad(socket: Socket) {
+    socket.on("load", async (data: Array<Stroke>) => {
+      const db = new Database(data);
+      const tags = await db.fetch();
+      socket.emit("loaded-tags", tags);
     });
   }
 }

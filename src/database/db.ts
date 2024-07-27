@@ -12,7 +12,7 @@ export class Database {
     this.#tag = tag;
   }
 
-  insert = async () => {
+  async insert() {
     const connection = this.#connect();
 
     try {
@@ -29,14 +29,36 @@ export class Database {
         );
       });
       Promise.all(queries);
-      console.log(`new tag: ${this.#tag_id} added`)
+      console.log(`new tag: ${this.#tag_id} added`);
     } catch (error) {
       console.error(error);
     } finally {
       (await connection).end();
       console.log("server has disconnected to the database");
     }
-  };
+  }
+
+  //fetches all the tags from users
+  async fetch(): Promise<Stroke[]> {
+    const connection = await this.#connect();
+
+    try {
+      const [result, packet]: [any[], mysql.FieldPacket[]] =
+        await connection.execute("SELECT * FROM stroke");
+      const tags = new Array<Stroke>();
+      for (const value of result) {
+        tags.push(new Stroke(value.x, value.y, value.color, value.size));
+      }
+
+      return tags;
+    } catch (error) {
+      console.log(error);
+      throw error; // Rethrow the error if you want to handle it further up the call stack
+    } finally {
+      await connection.end();
+      console.log("Server has disconnected from the database");
+    }
+  }
 
   #connect = async () => {
     // Create the connection to database

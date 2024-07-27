@@ -2,23 +2,27 @@
   "name": "grafitti",
   "version": "1.0.0",
   "description": "",
-  "main": "index.ts",
+  "main": "server.ts",
   "type": "module",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "s": "tsc && node dist/backend/server.js"
+    "s": "tsc && node dist/server.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
     "@types/http-server": "^0.12.4",
+    "dotenv": "^16.4.5",
     "express": "^4.19.2",
-    "socket.io": "^4.7.5"
+    "mysql2": "^3.10.3",
+    "socket.io": "^4.7.5",
+    "uuid": "^10.0.0"
   },
   "devDependencies": {
     "@types/express": "^4.17.21",
-    "@types/node": "^20.14.11",
+    "@types/node": "^20.14.12",
+    "@types/uuid": "^10.0.0",
     "typescript": "^5.5.3"
   }
 }

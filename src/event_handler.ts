@@ -9,16 +9,25 @@ export default class EventHandler {
 
   constructor(io: Server) {
     this.#io = io;
-    // this.#db.connect()
   }
 
   clientConnection() {
-    this.#io.on("connection", (socket: Socket) => {
+    this.#io.on("connection", async (socket: Socket) => {
       console.log("a client has successfully connected");
 
-      this.#handleStroke(socket);
-      this.#handleSave(socket);
-      this.#handleLoad(socket);
+      //Load all graffiti tags saved in canvas
+      const db = new Database();
+      const tags = await db.fetch();
+      socket.emit("boot-up", tags);
+
+      //Handles real-time paint strokes
+      this.#strokeListener(socket);
+
+      //Saves strokes from a client
+      this.#saveListener(socket);
+
+      //Resets the database
+      this.#clearListener(socket);
 
       socket.on("disconnect", () => {
         console.log("client disconnected");
@@ -27,10 +36,13 @@ export default class EventHandler {
       socket.on("error", (error: Error) => {
         console.log(error);
       });
+
+      //Load-Listener: FOR TESTING ONLY
+      this.#loadListener(socket);
     });
   }
 
-  #handleStroke(socket: Socket) {
+  #strokeListener(socket: Socket) {
     socket.on("stroke", (data: Stroke) => {
       //   console.log("x: " + data.xPos);
       //   console.log("y:" + data.yPos);
@@ -38,17 +50,24 @@ export default class EventHandler {
     });
   }
 
-  #handleSave(socket: Socket) {
+  #saveListener(socket: Socket) {
     socket.on("save", (data: Array<Stroke>) => {
       if (data.length > 0) {
-        new Database(data).insert();
+        new Database().insert(data);
       }
     });
   }
 
-  #handleLoad(socket: Socket) {
+  #clearListener(socket: Socket) {
+    socket.on("clear", async () => {
+      new Database().clear();
+    });
+  }
+
+  //FOR TESTING ONLY
+  #loadListener(socket: Socket) {
     socket.on("load", async (data: Array<Stroke>) => {
-      const db = new Database(data);
+      const db = new Database();
       const tags = await db.fetch();
       socket.emit("loaded-tags", tags);
     });

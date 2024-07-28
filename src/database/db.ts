@@ -6,24 +6,41 @@ import { ENV } from "../util/env.js";
 
 export class Database {
   #tag_id = uuid();
-  #tag: Array<Stroke>;
 
-  constructor(tag: Array<Stroke>) {
-    this.#tag = tag;
-  }
+  async insert(tag: Array<Stroke>) {
+    const connection = await this.#connect();
 
-  async insert() {
-    const connection = this.#connect();
+    //OPTIMIZATION: delete covered up spray paint before inserting
+    const strokes = Object.values(tag);
+    try {
+      const deletionRadius = 8;
+      let queries = strokes.map(async (stroke: Stroke) => {
+        const [result] = await connection.execute(
+          `DELETE FROM stroke WHERE
+         POW(x - ?, 2) + POW(y - ?, 2) <= POW(?, 2)`,
+          [
+            // Center of the circle and radius
+            Math.round(stroke.x),
+            Math.round(stroke.y),
+            deletionRadius,
+          ]
+        );
+      });
+
+      await Promise.all(queries);
+    } catch (err) {
+      console.log(err);
+    }
 
     try {
       //add tag
-      (await connection).execute(`INSERT INTO tag (id) VALUES (?)`, [
+      await connection.execute(`INSERT INTO tag (id) VALUES (?)`, [
         this.#tag_id,
       ]);
 
       //add strokes
-      let queries: Promise<void>[] = this.#tag.map(async (stroke: Stroke) => {
-        (await connection).execute(
+      let queries: Promise<void>[] = tag.map(async (stroke: Stroke) => {
+        await connection.execute(
           `INSERT INTO stroke (tag_id, x, y, color, size) VALUES (?, ?, ?, ?, ?)`,
           [this.#tag_id, stroke.x, stroke.y, stroke.color, stroke.size]
         );
@@ -59,6 +76,18 @@ export class Database {
       console.log("Server has disconnected from the database");
     }
   }
+
+  clear = async () => {
+    const connection = await this.#connect();
+    try {
+      await connection.execute("SET FOREIGN_KEY_CHECKS = 0");
+      await connection.execute("DELETE FROM tag");
+      await connection.execute("DELETE FROM stroke");
+      console.log("database reset");
+    } catch (error) {
+      console.log(error);
+    }
+  };
 
   #connect = async () => {
     // Create the connection to database

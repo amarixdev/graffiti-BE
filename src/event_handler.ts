@@ -2,7 +2,7 @@ import { Server, Socket } from "socket.io";
 import { Stroke } from "./util/types.js";
 import { Database } from "./database/db.js";
 import {} from "dotenv/config";
-import dotenv from "dotenv";
+import { generateFromEmail, generateUsername } from "unique-username-generator";
 
 export default class EventHandler {
   #io: Server;
@@ -11,14 +11,22 @@ export default class EventHandler {
     this.#io = io;
   }
 
+  #numberOfClientsConnected: number = -1;
+
   clientConnection() {
     this.#io.on("connection", async (socket: Socket) => {
-      console.log("a client has successfully connected");
+      let user = generateUsername("-", 1); // e.g blossom-logistical7
+      
+      console.log(` ${user} has successfully connected`);
+
+      //Send amount of # of clients connected to the frontend
+      this.#numberOfClientsConnected++;
+      this.#io.emit("client-connected", this.#numberOfClientsConnected);
 
       //Load all graffiti tags saved in canvas
       const db = new Database();
       const tags = await db.fetch();
-      socket.emit("boot-up", tags);
+      socket.emit("boot-up", tags, user);
 
       //Handles real-time paint strokes
       this.#strokeListener(socket);
@@ -29,8 +37,13 @@ export default class EventHandler {
       //Resets the database
       this.#clearListener(socket);
 
+      //Handles real-time chat log
+      this.#chatListener(socket, user);
+
       socket.on("disconnect", () => {
         console.log("client disconnected");
+        this.#numberOfClientsConnected--;
+        this.#io.emit("client-disconnected", this.#numberOfClientsConnected);
       });
 
       socket.on("error", (error: Error) => {
@@ -39,6 +52,12 @@ export default class EventHandler {
 
       //Load-Listener: FOR TESTING ONLY
       this.#loadListener(socket);
+    });
+  }
+
+  #chatListener(socket: Socket, user: string) {
+    socket.on("chat", (data: String) => {
+      socket.broadcast.emit("chat", data, user);
     });
   }
 

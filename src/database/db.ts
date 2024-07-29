@@ -64,7 +64,16 @@ export class Database {
         await connection.execute("SELECT * FROM stroke");
       const tags = new Array<Stroke>();
       for (const value of result) {
-        tags.push(new Stroke(value.x, value.y, value.color, value.size));
+        tags.push(
+          new Stroke(
+            value.x,
+            value.y,
+            value.px,
+            value.py,
+            value.color,
+            value.size
+          )
+        );
       }
 
       return tags;

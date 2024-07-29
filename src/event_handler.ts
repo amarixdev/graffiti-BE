@@ -44,8 +44,6 @@ export default class EventHandler {
 
   #strokeListener(socket: Socket) {
     socket.on("stroke", (data: Stroke) => {
-      //   console.log("x: " + data.xPos);
-      //   console.log("y:" + data.yPos);
       socket.broadcast.emit("stroke", data);
     });
   }

@@ -12,25 +12,25 @@ export class Database {
 
     //OPTIMIZATION: delete covered up spray paint before inserting
     const strokes = Object.values(tag);
-    try {
-      const deletionRadius = 8;
-      let queries = strokes.map(async (stroke: Stroke) => {
-        const [result] = await connection.execute(
-          `DELETE FROM stroke WHERE
-         POW(x - ?, 2) + POW(y - ?, 2) <= POW(?, 2)`,
-          [
-            // Center of the circle and radius
-            Math.round(stroke.x),
-            Math.round(stroke.y),
-            deletionRadius,
-          ]
-        );
-      });
+    // try {
+    //   const deletionRadius = 8;
+    //   let queries = strokes.map(async (stroke: Stroke) => {
+    //     const [result] = await connection.execute(
+    //       `DELETE FROM stroke WHERE
+    //      POW(x - ?, 2) + POW(y - ?, 2) <= POW(?, 2)`,
+    //       [
+    //         // Center of the circle and radius
+    //         Math.round(stroke.x),
+    //         Math.round(stroke.y),
+    //         deletionRadius,
+    //       ]
+    //     );
+    //   });
 
-      await Promise.all(queries);
-    } catch (err) {
-      console.log(err);
-    }
+    //   await Promise.all(queries);
+    // } catch (err) {
+    //   console.log(err);
+    // }
 
     try {
       //add tag
@@ -41,8 +41,16 @@ export class Database {
       //add strokes
       let queries: Promise<void>[] = tag.map(async (stroke: Stroke) => {
         await connection.execute(
-          `INSERT INTO stroke (tag_id, x, y, color, size) VALUES (?, ?, ?, ?, ?)`,
-          [this.#tag_id, stroke.x, stroke.y, stroke.color, stroke.size]
+          `INSERT INTO stroke (tag_id, x, y, px, py, color, size) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [
+            this.#tag_id,
+            stroke.x,
+            stroke.y,
+            stroke.px,
+            stroke.py,
+            stroke.color,
+            stroke.size,
+          ]
         );
       });
       Promise.all(queries);

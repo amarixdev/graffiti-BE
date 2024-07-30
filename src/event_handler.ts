@@ -11,12 +11,12 @@ export default class EventHandler {
     this.#io = io;
   }
 
-  #numberOfClientsConnected: number = -1;
+  #numberOfClientsConnected: number = 0;
 
   clientConnection() {
     this.#io.on("connection", async (socket: Socket) => {
       let user = generateUsername("-", 1); // e.g blossom-logistical7
-      
+
       console.log(` ${user} has successfully connected`);
 
       //Send amount of # of clients connected to the frontend
@@ -70,6 +70,7 @@ export default class EventHandler {
   #saveListener(socket: Socket) {
     socket.on("save", (data: Array<Stroke>) => {
       if (data.length > 0) {
+        console.log(data);
         new Database().insert(data);
       }
     });

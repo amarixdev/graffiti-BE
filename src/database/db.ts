@@ -7,7 +7,7 @@ import { ENV } from "../util/env.js";
 export class Database {
   #tag_id = uuid();
 
-  async insert(tag: Array<Stroke>) {
+  async insert(tag: Array<Stroke>, user: string) {
     const connection = await this.#connect();
 
     //OPTIMIZATION: delete covered up spray paint before inserting
@@ -34,16 +34,14 @@ export class Database {
 
     try {
       //add tag
-      await connection.execute(`INSERT INTO tag (id) VALUES (?)`, [
-        this.#tag_id,
-      ]);
+      await connection.execute(`INSERT INTO tag (id) VALUES (?)`, [user]);
 
       //add strokes
       let queries: Promise<void>[] = tag.map(async (stroke: Stroke) => {
         await connection.execute(
           `INSERT INTO stroke (tag_id, x, y, px, py, color, size) VALUES (?, ?, ?, ?, ?, ?, ?)`,
           [
-            this.#tag_id,
+            user,
             stroke.x,
             stroke.y,
             stroke.px,
@@ -54,7 +52,7 @@ export class Database {
         );
       });
       Promise.all(queries);
-      console.log(`new tag: ${this.#tag_id} added`);
+      console.log(`new tag: ${user} added`);
     } catch (error) {
       console.error(error);
     } finally {

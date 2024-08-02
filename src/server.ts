@@ -5,7 +5,7 @@ import * as http from "http";
 import EventHandler from "./event_handler.js";
 import dotenv from "dotenv";
 dotenv.config();
-console.log(process.env.DB_NAME)
+console.log(process.env.DB_NAME);
 
 class SocketIOServer {
   #PORT: number;

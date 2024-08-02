@@ -15,7 +15,7 @@ export default class EventHandler {
 
   clientConnection() {
     this.#io.on("connection", async (socket: Socket) => {
-      let user = generateUsername("-", 1); // e.g blossom-logistical7
+      let user = generateUsername("-", 2); // e.g blossom-logistical7
 
       console.log(` ${user} has successfully connected`);
 
@@ -26,13 +26,13 @@ export default class EventHandler {
       //Load all graffiti tags saved in canvas
       const db = new Database();
       const tags = await db.fetch();
-      socket.emit("boot-up", tags, user);
+      socket.emit("boot-up", tags, user, this.#numberOfClientsConnected);
 
       //Handles real-time paint strokes
       this.#strokeListener(socket);
 
       //Saves strokes from a client
-      this.#saveListener(socket);
+      this.#saveListener(socket, user);
 
       //Resets the database
       this.#clearListener(socket);
@@ -67,11 +67,11 @@ export default class EventHandler {
     });
   }
 
-  #saveListener(socket: Socket) {
+  #saveListener(socket: Socket, user: string) {
     socket.on("save", (data: Array<Stroke>) => {
       if (data.length > 0) {
         console.log(data);
-        new Database().insert(data);
+        new Database().insert(data, user);
       }
     });
   }

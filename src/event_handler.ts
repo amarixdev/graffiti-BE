@@ -1,8 +1,8 @@
 import { Server, Socket } from "socket.io";
 import { Stroke } from "./util/types.js";
-import { Database } from "./database/db.js";
 import {} from "dotenv/config";
-import { generateFromEmail, generateUsername } from "unique-username-generator";
+import { generateUsername } from "unique-username-generator";
+import MongoDatabase from "./database/db_mongo.js";
 
 export default class EventHandler {
   #io: Server;
@@ -11,7 +11,7 @@ export default class EventHandler {
     this.#io = io;
   }
 
-  #numberOfClientsConnected: number = 0;
+  #clientCount: number = 0;
 
   clientConnection() {
     this.#io.on("connection", async (socket: Socket) => {
@@ -20,13 +20,13 @@ export default class EventHandler {
       console.log(` ${user} has successfully connected`);
 
       //Send amount of # of clients connected to the frontend
-      this.#numberOfClientsConnected++;
-      this.#io.emit("client-connected", this.#numberOfClientsConnected);
+      this.#clientCount++;
+      this.#io.emit("client-connected", this.#clientCount);
 
       //Load all graffiti tags saved in canvas
-      const db = new Database();
-      const tags = await db.fetch();
-      socket.emit("boot-up", tags, user, this.#numberOfClientsConnected);
+      const mdb = new MongoDatabase();
+      const tagPreviews = await mdb.getTagPreviews();
+      socket.emit("boot-up", user, this.#clientCount, tagPreviews);
 
       //Handles real-time paint strokes
       this.#strokeListener(socket);
@@ -42,16 +42,13 @@ export default class EventHandler {
 
       socket.on("disconnect", () => {
         console.log("client disconnected");
-        this.#numberOfClientsConnected--;
-        this.#io.emit("client-disconnected", this.#numberOfClientsConnected);
+        this.#clientCount--;
+        this.#io.emit("client-disconnected", this.#clientCount);
       });
 
       socket.on("error", (error: Error) => {
         console.log(error);
       });
-
-      //Load-Listener: FOR TESTING ONLY
-      this.#loadListener(socket);
     });
   }
 
@@ -68,26 +65,16 @@ export default class EventHandler {
   }
 
   #saveListener(socket: Socket, user: string) {
-    socket.on("save", (data: Array<Stroke>) => {
+    socket.on("save", (data: Array<Stroke>, imageURL: string) => {
       if (data.length > 0) {
-        console.log(data);
-        new Database().insert(data, user);
+        new MongoDatabase().createTag(data, user, imageURL);
       }
     });
   }
 
   #clearListener(socket: Socket) {
     socket.on("clear", async () => {
-      new Database().clear();
-    });
-  }
-
-  //FOR TESTING ONLY
-  #loadListener(socket: Socket) {
-    socket.on("load", async (data: Array<Stroke>) => {
-      const db = new Database();
-      const tags = await db.fetch();
-      socket.emit("loaded-tags", tags);
+      new MongoDatabase().reset();
     });
   }
 }

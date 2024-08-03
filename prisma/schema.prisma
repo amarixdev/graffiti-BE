@@ -1,0 +1,32 @@
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Artist {
+  id     String   @id @default(auto()) @map("_id") @db.ObjectId
+  name   String
+  tags   Tag[]    @relation(fields: [tagIds], references: [id])
+  tagIds String[] @db.ObjectId
+}
+
+model Tag {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  strokes   Stroke[]
+  imageURL  String
+  artists   Artist[] @relation(fields: [artistIds], references: [id])
+  artistIds String[] @db.ObjectId
+}
+
+type Stroke {
+  x     Int
+  y     Int
+  px    Int
+  py    Int
+  color String
+  size  Int
+}

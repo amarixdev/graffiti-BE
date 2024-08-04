@@ -1,8 +1,18 @@
 import { PrismaClient } from "@prisma/client";
-import { ImagePreviews, Stroke, ImageFile } from "../util/types.js";
+import { ImagePreviews, Stroke } from "../util/types.js";
 
 export default class MongoDatabase {
   prisma = new PrismaClient();
+
+  private constructor() {}
+  private static instance: MongoDatabase;
+
+  static getInstance() {
+    if (!this.instance) {
+      this.instance = new MongoDatabase();
+    }
+    return this.instance;
+  }
 
   async createTag(
     tag: Array<Stroke>,
@@ -36,6 +46,7 @@ export default class MongoDatabase {
     const imgPreviews = await this.prisma.tag
       .findMany({
         select: {
+          id: true,
           imageFile: true,
         },
       })
@@ -47,7 +58,36 @@ export default class MongoDatabase {
         await this.prisma.$disconnect();
       });
 
-    return imgPreviews;
+    const previews = imgPreviews.map((data) => {
+      const preview = {
+        id: data.id,
+        imageFile: data.imageFile,
+      };
+      return preview;
+    });
+
+    return previews;
+  }
+
+  async getTagStrokes(id: string) {
+    const tag = await this.prisma.tag
+      .findFirst({
+        where: {
+          id: id,
+        },
+        select: {
+          strokes: true,
+        },
+      })
+      .catch(async (e) => {
+        console.error(e);
+        process.exit(1);
+      })
+      .finally(async () => {
+        await this.prisma.$disconnect();
+      });
+
+    return tag;
   }
 
   //Dev only

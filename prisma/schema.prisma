@@ -9,7 +9,7 @@ generator client {
 
 model Artist {
   id     String   @id @default(auto()) @map("_id") @db.ObjectId
-  name   String
+  name   String   @unique
   tags   Tag[]    @relation(fields: [tagIds], references: [id])
   tagIds String[] @db.ObjectId
 }

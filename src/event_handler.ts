@@ -1,5 +1,5 @@
 import { DisconnectReason, Server, Socket } from "socket.io";
-import { ImageFile, Stroke } from "./util/types.js";
+import { ImageFile, ImagePreviews, Stroke } from "./util/types.js";
 import {} from "dotenv/config";
 import MongoDatabase from "./database/db_mongo.js";
 import { generateUsername } from "unique-username-generator";
@@ -31,7 +31,7 @@ export default class SocketEventHandler {
         mimetype: img.mimetype,
         size: bytesToMB(img.buffer.length),
       };
-      const db = new MongoDatabase();
+      const db = MongoDatabase.getInstance();
       db.createTag(tag, this.sessionUser, imageFile);
     }
   }
@@ -49,8 +49,8 @@ export default class SocketEventHandler {
       this.io.emit("client-connected", this.sessions.size);
 
       //Load all graffiti tags saved in canvas
-      const mdb = new MongoDatabase();
-      const tagPreviews = await mdb.getTagPreviews();
+      const mdb = MongoDatabase.getInstance();
+      const tagPreviews: ImagePreviews[] = await mdb.getTagPreviews();
       socket.emit("boot-up", this.sessionUser, this.sessions.size, tagPreviews);
 
       //Handles real-time paint strokes
@@ -94,14 +94,14 @@ export default class SocketEventHandler {
     socket.on("save", (data: Array<Stroke>, imageURL: string) => {
       console.log(data);
       if (data.length > 0) {
-        new MongoDatabase().createTag(data, user, imageURL);
+        MongoDatabase.getInstance().createTag(data, user, imageURL);
       }
     });
   }
 
   private clearListener(socket: Socket) {
     socket.on("clear", async () => {
-      new MongoDatabase().reset();
+      MongoDatabase.getInstance().reset();
     });
   }
 }

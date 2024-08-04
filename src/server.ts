@@ -49,9 +49,6 @@ class SocketIOServer {
   }
 
   start() {
-    //generate a username
-    let sessionUser = generateUsername("-", 2); // e.g blossom-logistical74
-
     this.#app.get("/", (req, res) => {
       res.set({
         "Access-Control-Allow-Headers": "Content-Type, Authorization",
@@ -65,7 +62,7 @@ class SocketIOServer {
     const upload = multer({ storage });
 
     // Handle POST request for image upload
-    this.#app.post("/data", upload.single("image"), (req, res) => {
+    this.#app.post("/post-canvas", upload.single("image"), (req, res) => {
       const tag: Array<Stroke> = JSON.parse(req.body.tag);
       const img: Express.Multer.File | undefined = req.file;
       SocketEventHandler.getInstance(this.#io).sendTagToDatabase(tag, img);
@@ -74,6 +71,16 @@ class SocketIOServer {
         message: "Data received",
         tag: JSON.parse(req.body.tag),
         file: req.file,
+      });
+    });
+
+    this.#app.post("/render-canvas", async (req, res) => {
+      const id = req.body;
+      const data = await MongoDatabase.getInstance().getTagStrokes(id);
+      console.log(data?.strokes);
+      res.json({
+        message: "ID received",
+        strokes: data?.strokes,
       });
     });
 

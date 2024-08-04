@@ -1,5 +1,5 @@
 import { PrismaClient } from "@prisma/client";
-import { ImagePreviews, Stroke } from "../util/types.js";
+import { ImagePreviews, Stroke, ImageFile } from "../util/types.js";
 
 export default class MongoDatabase {
   prisma = new PrismaClient();
@@ -7,13 +7,14 @@ export default class MongoDatabase {
   async createTag(
     tag: Array<Stroke>,
     user: string,
-    imageURL: string
+    imageFile: any
   ): Promise<void> {
+    console.log("attempting to create tag....");
     await this.prisma.tag
       .create({
         data: {
           strokes: tag,
-          imageURL: imageURL,
+          imageFile: imageFile,
           artists: {
             create: {
               name: user,
@@ -31,11 +32,11 @@ export default class MongoDatabase {
       });
   }
 
-  async getTagPreviews(): Promise<ImagePreviews[]> {
-    const imgPreviews: ImagePreviews[] = await this.prisma.tag
+  async getTagPreviews(): Promise<any[]> {
+    const imgPreviews = await this.prisma.tag
       .findMany({
         select: {
-          imageURL: true,
+          imageFile: true,
         },
       })
       .catch(async (e) => {

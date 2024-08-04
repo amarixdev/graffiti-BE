@@ -1,11 +1,17 @@
-import express from "express";
+import express, { RequestHandler } from "express";
 import { createServer } from "http";
 import { Server } from "socket.io";
 import * as http from "http";
 import EventHandler from "./event_handler.js";
 import dotenv from "dotenv";
+import cors from "cors";
 dotenv.config();
-console.log(process.env.DB_NAME);
+import multer from "multer";
+import MongoDatabase from "./database/db_mongo.js";
+import { generateUsername } from "unique-username-generator";
+import SocketEventHandler from "./event_handler.js";
+import { Stroke, ImageFile } from "./util/types.js";
+import { Http2ServerRequest } from "http2";
 
 class SocketIOServer {
   #PORT: number;
@@ -20,6 +26,17 @@ class SocketIOServer {
     this.#HOSTNAME = "localhost";
     this.#app = express();
     this.#server = createServer(this.#app);
+    this.#app.use(
+      cors({
+        origin: this.#origin,
+        methods: ["GET", "POST"],
+        credentials: true,
+      })
+    );
+
+    this.#app.use(express.json());
+    this.#app.use(express.urlencoded({ extended: true }));
+    this.#app.use(express.text());
 
     this.#io = new Server(this.#server, {
       cors: {
@@ -27,24 +44,40 @@ class SocketIOServer {
         methods: ["GET", "POST"],
         credentials: true,
       },
+      transports: ["websocket", "polling"],
     });
   }
 
-  //TODO: Serve the latest wall-state
   start() {
+    //generate a username
+    let sessionUser = generateUsername("-", 2); // e.g blossom-logistical74
+
     this.#app.get("/", (req, res) => {
       res.set({
         "Access-Control-Allow-Headers": "Content-Type, Authorization",
         "Access-Control-Allow-Origin": this.#origin,
         "Access-Control-Allow-Credentials": true,
       });
-      res.send("Connected");
     });
 
-    //handleEvents
-    const handler = new EventHandler(this.#io);
-    handler.clientConnection();
+    // Configure multer for file uploads
+    const storage = multer.memoryStorage();
+    const upload = multer({ storage });
 
+    // Handle POST request for image upload
+    this.#app.post("/data", upload.single("image"), (req, res) => {
+      const tag: Array<Stroke> = JSON.parse(req.body.tag);
+      const img: Express.Multer.File | undefined = req.file;
+      SocketEventHandler.getInstance(this.#io).sendTagToDatabase(tag, img);
+
+      res.json({
+        message: "Data received",
+        tag: JSON.parse(req.body.tag),
+        file: req.file,
+      });
+    });
+
+    SocketEventHandler.getInstance(this.#io).setup();
     this.#server.listen(this.#PORT, this.#HOSTNAME, () => {
       console.log(`server running on http://${this.#HOSTNAME}:${this.#PORT}`);
     });

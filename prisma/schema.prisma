@@ -15,11 +15,11 @@ model Artist {
 }
 
 model Tag {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  id        String    @id @default(auto()) @map("_id") @db.ObjectId
   strokes   Stroke[]
-  imageURL  String
-  artists   Artist[] @relation(fields: [artistIds], references: [id])
-  artistIds String[] @db.ObjectId
+  imageFile ImageFile
+  artists   Artist[]  @relation(fields: [artistIds], references: [id])
+  artistIds String[]  @db.ObjectId
 }
 
 type Stroke {
@@ -29,4 +29,11 @@ type Stroke {
   py    Int
   color String
   size  Int
+}
+
+type ImageFile {
+  filename String
+  mimetype String
+  size     Float
+  buffer   Bytes
 }

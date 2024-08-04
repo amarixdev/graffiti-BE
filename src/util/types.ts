@@ -7,6 +7,13 @@ export type ImagePreviews = {
   imageURL: string;
 };
 
+export type ImageFile = {
+  filename: string;
+  mimetype: string;
+  size: number;
+  buffer: Buffer;
+};
+
 export class Stroke {
   x: number;
   y: number;
@@ -31,4 +38,3 @@ export class Stroke {
     this.size = size;
   }
 }
-

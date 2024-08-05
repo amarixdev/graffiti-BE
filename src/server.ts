@@ -12,6 +12,8 @@ import { generateUsername } from "unique-username-generator";
 import SocketEventHandler from "./event_handler.js";
 import { Stroke, ImageFile } from "./util/types.js";
 import { Http2ServerRequest } from "http2";
+import { bytesToMB } from "./util/functions.js";
+import { v4 as UUID } from "uuid";
 
 class SocketIOServer {
   #PORT: number;
@@ -63,9 +65,25 @@ class SocketIOServer {
 
     // Handle POST request for image upload
     this.#app.post("/post-canvas", upload.single("image"), (req, res) => {
+      const method = JSON.parse(req.body.method);
+      const canvasId = JSON.parse(req.body.id);
+      console.log(method);
       const tag: Array<Stroke> = JSON.parse(req.body.tag);
       const img: Express.Multer.File | undefined = req.file;
-      SocketEventHandler.getInstance(this.#io).sendTagToDatabase(tag, img);
+      if (img) {
+        const imageFile: ImageFile = {
+          filename: UUID(),
+          buffer: img.buffer,
+          mimetype: img.mimetype,
+          size: bytesToMB(img.buffer.length),
+        };
+
+        if (method == "post") {
+          SocketEventHandler.getInstance().sendTagToDatabase(tag, imageFile);
+        } else {
+          MongoDatabase.getInstance().updateTag(canvasId, tag, imageFile);
+        }
+      }
 
       res.json({
         message: "Data received",
@@ -77,14 +95,13 @@ class SocketIOServer {
     this.#app.post("/render-canvas", async (req, res) => {
       const id = req.body;
       const data = await MongoDatabase.getInstance().getTagStrokes(id);
-      console.log(data?.strokes);
       res.json({
         message: "ID received",
         strokes: data?.strokes,
       });
     });
 
-    SocketEventHandler.getInstance(this.#io).setup();
+    SocketEventHandler.getInstance().setup(this.#io);
     this.#server.listen(this.#PORT, this.#HOSTNAME, () => {
       console.log(`server running on http://${this.#HOSTNAME}:${this.#PORT}`);
     });

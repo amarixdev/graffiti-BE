@@ -1,5 +1,8 @@
 import { PrismaClient } from "@prisma/client";
-import { ImagePreviews, Stroke } from "../util/types.js";
+import { ImageFile, ImagePreview, Stroke } from "../util/types.js";
+import SocketEventHandler from "../event_handler.js";
+import { ObjectId } from "mongodb";
+import { QueryType } from "../util/enums.js";
 
 export default class MongoDatabase {
   prisma = new PrismaClient();
@@ -14,22 +17,16 @@ export default class MongoDatabase {
     return this.instance;
   }
 
-  async createTag(
-    tag: Array<Stroke>,
-    user: string,
-    imageFile: any
-  ): Promise<void> {
-    console.log("attempting to create tag....");
+  async updateTag(id: string, strokes: Array<Stroke>, imageFile: ImageFile) {
+    console.log("attempting to update tag....");
     await this.prisma.tag
-      .create({
+      .update({
+        where: {
+          id: id,
+        },
         data: {
-          strokes: tag,
+          strokes: strokes,
           imageFile: imageFile,
-          artists: {
-            create: {
-              name: user,
-            },
-          },
         },
       })
       .catch(async (e) => {
@@ -37,9 +34,47 @@ export default class MongoDatabase {
         process.exit(1);
       })
       .finally(async () => {
-        console.log(`${user}'s tag successfully added`);
+        const socketHandler = SocketEventHandler.getInstance();
+        socketHandler.notifyPreviewLoaded(id, imageFile, QueryType.update);
+        console.log(`tag ${id} successfully updated`);
         await this.prisma.$disconnect();
       });
+  }
+
+  async createTag(
+    tag: Array<Stroke>,
+    user: string,
+    imageFile: ImageFile | undefined
+  ): Promise<void> {
+    if (imageFile) {
+      const id = new ObjectId().toString();
+      console.log("attempting to create tag....");
+      await this.prisma.tag
+        .create({
+          data: {
+            strokes: tag,
+            imageFile: imageFile,
+            id: id,
+            artists: {
+              create: {
+                name: user,
+              },
+            },
+          },
+        })
+        .catch(async (e) => {
+          console.error(e);
+          process.exit(1);
+        })
+        .finally(async () => {
+          console.log(`${user}'s tag successfully added`);
+          const socketHandler = SocketEventHandler.getInstance();
+
+          //notify client when tag has been created; sends the canvas preview
+          socketHandler.notifyPreviewLoaded(id, imageFile, QueryType.create);
+          await this.prisma.$disconnect();
+        });
+    }
   }
 
   async getTagPreviews(): Promise<any[]> {
@@ -59,7 +94,7 @@ export default class MongoDatabase {
       });
 
     const previews = imgPreviews.map((data) => {
-      const preview = {
+      const preview: ImagePreview = {
         id: data.id,
         imageFile: data.imageFile,
       };

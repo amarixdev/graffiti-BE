@@ -3,7 +3,7 @@ export type BrushStroke = {
   yPos: number;
 };
 
-export type ImagePreviews = {
+export type ImagePreview = {
   id: String;
   imageFile: ImageFile;
 };

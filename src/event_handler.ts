@@ -1,44 +1,37 @@
 import { DisconnectReason, Server, Socket } from "socket.io";
-import { ImageFile, ImagePreviews, Stroke } from "./util/types.js";
+import { ImageFile, ImagePreview, Stroke } from "./util/types.js";
 import {} from "dotenv/config";
 import MongoDatabase from "./database/db_mongo.js";
 import { generateUsername } from "unique-username-generator";
 import { bytesToMB } from "./util/functions.js";
+import { QueryType } from "./util/enums.js";
 
 export default class SocketEventHandler {
-  private io: Server;
   private sessionUser: string;
   private sessions: Set<String> = new Set();
   private static instance: SocketEventHandler;
+  private socket: Socket | null = null; // Initialize with null
 
-  static getInstance(io: Server) {
+  static getInstance() {
     if (!this.instance) {
-      this.instance = new SocketEventHandler(io);
+      this.instance = new SocketEventHandler();
     }
     return this.instance;
   }
 
-  private constructor(io: Server) {
-    this.io = io;
+  private constructor() {
     this.sessionUser = generateUsername("-", 2); // e.g blossom-logistical74
   }
 
-  sendTagToDatabase(tag: Array<Stroke>, img: Express.Multer.File | undefined) {
-    if (img) {
-      const imageFile: ImageFile = {
-        filename: img.originalname,
-        buffer: img.buffer,
-        mimetype: img.mimetype,
-        size: bytesToMB(img.buffer.length),
-      };
-      const db = MongoDatabase.getInstance();
-      db.createTag(tag, this.sessionUser, imageFile);
-    }
+  sendTagToDatabase(tag: Array<Stroke>, imageFile: ImageFile | undefined) {
+    const db = MongoDatabase.getInstance();
+    db.createTag(tag, this.sessionUser, imageFile);
   }
 
-  setup() {
-    this.io.on("connection", async (socket: Socket) => {
+  setup(io: Server) {
+    io.on("connection", async (socket: Socket) => {
       //generate a new user per client session
+      this.socket = socket;
       this.sessionUser = generateUsername("-", 2);
       console.log(` ${this.sessionUser} has successfully connected`);
       this.sessions.add(this.sessionUser);
@@ -46,18 +39,19 @@ export default class SocketEventHandler {
       // session user should update each connection
 
       //Send amount of # of clients connected to the frontend
-      this.io.emit("client-connected", this.sessions.size);
+      io.emit("client-connected", this.sessions.size);
 
       //Load all graffiti tags saved in canvas
       const mdb = MongoDatabase.getInstance();
-      const tagPreviews: ImagePreviews[] = await mdb.getTagPreviews();
+      const tagPreviews: ImagePreview[] = await mdb.getTagPreviews();
+      console.log(tagPreviews);
       socket.emit("boot-up", this.sessionUser, this.sessions.size, tagPreviews);
 
       //Handles real-time paint strokes
       this.strokeListener(socket);
 
       //Saves strokes from a client
-      this.saveListener(socket, this.sessionUser);
+      // this.saveListener(socket, this.sessionUser);
 
       //Resets the database
       this.clearListener(socket);
@@ -69,13 +63,35 @@ export default class SocketEventHandler {
         console.log(data);
         console.log(this.sessionUser + " has disconnected");
         this.sessions.delete(this.sessionUser);
-        this.io.emit("client-disconnected", this.sessions.size);
+        io.emit("client-disconnected", this.sessions.size);
       });
 
       socket.on("error", (error: Error) => {
         console.log(error);
       });
     });
+  }
+
+  async notifyPreviewLoaded(
+    id: string,
+    imageFile: ImageFile,
+    query: QueryType
+  ) {
+    const imagePreview: ImagePreview = {
+      id: id,
+      imageFile: imageFile,
+    };
+
+    if (this.socket) {
+      switch (query) {
+        case QueryType.create:
+          this.socket.emit("preview-loaded", imagePreview);
+          break;
+        case QueryType.update:
+          this.socket.emit("preview-updated", imagePreview);
+          break;
+      }
+    }
   }
 
   private chatListener(socket: Socket, user: string) {
@@ -87,15 +103,6 @@ export default class SocketEventHandler {
   private strokeListener(socket: Socket) {
     socket.on("stroke", (data: Stroke) => {
       socket.broadcast.emit("stroke", data);
-    });
-  }
-
-  private saveListener(socket: Socket, user: string) {
-    socket.on("save", (data: Array<Stroke>, imageURL: string) => {
-      console.log(data);
-      if (data.length > 0) {
-        MongoDatabase.getInstance().createTag(data, user, imageURL);
-      }
     });
   }
 

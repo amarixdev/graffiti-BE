@@ -3,15 +3,14 @@ import { ImageFile, ImagePreview, Stroke } from "./util/types.js";
 import {} from "dotenv/config";
 import MongoDatabase from "./database/db_mongo.js";
 import { generateUsername } from "unique-username-generator";
-import { bytesToMB } from "./util/functions.js";
 import { QueryType } from "./util/enums.js";
 
 export default class SocketEventHandler {
   private sessionUser: string;
   private sessions: Set<String> = new Set();
-  private static instance: SocketEventHandler;
   private socket: Socket | null = null; // Initialize with null
 
+  private static instance: SocketEventHandler;
   static getInstance() {
     if (!this.instance) {
       this.instance = new SocketEventHandler();
@@ -44,23 +43,24 @@ export default class SocketEventHandler {
       //Load all graffiti tags saved in canvas
       const mdb = MongoDatabase.getInstance();
       const tagPreviews: ImagePreview[] = await mdb.getTagPreviews();
-      console.log(tagPreviews);
       socket.emit("boot-up", this.sessionUser, this.sessions.size, tagPreviews);
 
       //Handles real-time paint strokes
       this.strokeListener(socket);
 
-      //Saves strokes from a client
-      // this.saveListener(socket, this.sessionUser);
+      //generate a new username
+      this.generateUser(socket);
 
       //Resets the database
       this.clearListener(socket);
 
       //Handles real-time chat log
-      this.chatListener(socket, this.sessionUser);
+      this.chatListener(socket);
+
+      //update session username
+      this.updateUsername(socket);
 
       socket.on("disconnect", (data: DisconnectReason) => {
-        console.log(data);
         console.log(this.sessionUser + " has disconnected");
         this.sessions.delete(this.sessionUser);
         io.emit("client-disconnected", this.sessions.size);
@@ -81,22 +81,38 @@ export default class SocketEventHandler {
       id: id,
       imageFile: imageFile,
     };
-
+    console.log("server socket: " + this.socket);
     if (this.socket) {
       switch (query) {
         case QueryType.create:
           this.socket.emit("preview-loaded", imagePreview);
+          console.log("loaded notified");
           break;
         case QueryType.update:
           this.socket.emit("preview-updated", imagePreview);
+          console.log("update notified");
           break;
       }
     }
   }
 
-  private chatListener(socket: Socket, user: string) {
-    socket.on("chat", (data: String) => {
-      socket.broadcast.emit("chat", data, user);
+  private generateUser(socket: Socket) {
+    socket.on("generate-user", () => {
+      const newUser = generateUsername("-", 2);
+      this.sessionUser = newUser;
+      socket.emit("generate-user", newUser);
+    });
+  }
+
+  private updateUsername(socket: Socket) {
+    socket.on("update-user", (newUser: string) => {
+      this.sessionUser = newUser;
+    });
+  }
+
+  private chatListener(socket: Socket) {
+    socket.on("chat", (message: string) => {
+      socket.broadcast.emit("chat", message, this.sessionUser);
     });
   }
 

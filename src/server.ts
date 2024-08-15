@@ -87,7 +87,12 @@ class SocketIOServer {
             imageFile
           );
         } else {
-          MongoDatabase.getInstance().updateTag(canvasId, tag, imageFile);
+          MongoDatabase.getInstance().updateTag(
+            canvasId,
+            tag,
+            artist,
+            imageFile
+          );
         }
       }
 

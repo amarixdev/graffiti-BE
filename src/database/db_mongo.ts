@@ -17,33 +17,24 @@ export default class MongoDatabase {
     return this.instance;
   }
 
-  async updateTag(id: string, strokes: Array<Stroke>, imageFile: ImageFile) {
+  async updateTag(
+    tagID: string,
+    strokes: Array<Stroke>,
+    username: string,
+    imageFile: ImageFile
+  ) {
     console.log("attempting to update tag....");
-    await this.prisma.tag
-      .update({
-        where: {
-          id: id,
-        },
-        data: {
-          strokes: strokes,
-          imageFile: imageFile,
-        },
-      })
-      .catch(async (e) => {
-        console.error(e);
-        process.exit(1);
-      })
-      .finally(async () => {
-        const socketHandler = SocketEventHandler.getInstance();
-        socketHandler.notifyPreviewLoaded(
-          id,
-          imageFile,
-          null,
-          QueryType.update
-        );
-        console.log(`tag ${id} successfully updated`);
-        await this.prisma.$disconnect();
-      });
+    //adds to artist to tag
+    await this.ensureArtistTagConnection(username, tagID);
+    const artistNames = await this.fetchArtistsNamesFromTag(tagID);
+    await this.updateTagWithNewStrokes(
+      tagID,
+      strokes,
+      imageFile,
+      artistNames
+    ).finally(() =>
+      this.notifyOnCompletion(artistNames, tagID, imageFile, QueryType.update)
+    );
   }
 
   async createCanvasPreview(
@@ -62,8 +53,13 @@ export default class MongoDatabase {
             imageFile: imageFile,
             id: id,
             artists: {
-              create: {
-                name: user,
+              connectOrCreate: {
+                where: {
+                  name: user, // Look for an existing user with this name
+                },
+                create: {
+                  name: user, // If the user doesn't exist, create a new one
+                },
               },
             },
           },
@@ -72,19 +68,9 @@ export default class MongoDatabase {
           console.error(e);
           process.exit(1);
         })
-        .finally(async () => {
-          console.log(`${user}'s tag successfully added`);
-          const socketHandler = SocketEventHandler.getInstance();
-
-          //notify client when tag has been created; sends the canvas preview
-          socketHandler.notifyPreviewLoaded(
-            id,
-            imageFile,
-            [user],
-            QueryType.create
-          );
-          await this.prisma.$disconnect();
-        });
+        .finally(() =>
+          this.notifyOnCompletion([user], id, imageFile, QueryType.create)
+        );
     }
   }
 
@@ -168,4 +154,89 @@ export default class MongoDatabase {
     await this.prisma.artist.deleteMany();
     await this.prisma.tag.deleteMany();
   }
+
+  private async ensureArtistTagConnection(
+    username: string,
+    tagID: string
+  ): Promise<void> {
+    await this.prisma.artist
+      .upsert({
+        where: {
+          name: username,
+        },
+        update: {
+          tags: {
+            connect: {
+              id: tagID,
+            },
+          },
+        },
+        create: {
+          id: new ObjectId().toString(),
+          name: username,
+          tags: {
+            connect: {
+              id: tagID,
+            },
+          },
+        },
+      })
+      .catch(async (e) => {
+        console.error(e);
+        process.exit(1);
+      });
+  }
+
+  private async updateTagWithNewStrokes(
+    tagID: string,
+    strokes: Array<Stroke>,
+    imageFile: ImageFile,
+    artistNames: string[] | undefined
+  ) {
+    await this.prisma.tag
+      .update({
+        where: {
+          id: tagID,
+        },
+        data: {
+          strokes: strokes,
+          imageFile: imageFile,
+        },
+      })
+      .catch(async (e) => {
+        console.error(e);
+        process.exit(1);
+      });
+  }
+
+  private async fetchArtistsNamesFromTag(
+    tagID: string
+  ): Promise<string[] | undefined> {
+    const tag_artists = await this.prisma.tag.findUnique({
+      where: {
+        id: tagID,
+      },
+      select: {
+        artists: true,
+      },
+    });
+    const artistNames = tag_artists?.artists.map((artist) => {
+      return artist.name;
+    });
+    return artistNames;
+  }
+
+  private async notifyOnCompletion(
+    artistNames: string[] | undefined,
+    tagID: string,
+    imageFile: ImageFile,
+    method: QueryType
+  ) {
+    const socketHandler = SocketEventHandler.getInstance();
+    if (artistNames)
+      socketHandler.notifyPreviewLoaded(tagID, imageFile, artistNames, method);
+    console.log(`tag ${tagID} successfully updated`);
+    await this.prisma.$disconnect();
+  }
+
 }

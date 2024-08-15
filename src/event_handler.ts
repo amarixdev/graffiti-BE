@@ -6,10 +6,7 @@ import { generateUsername } from "unique-username-generator";
 import { QueryType } from "./util/enums.js";
 
 export default class SocketEventHandler {
-  private sessionUser: string;
-  private sessions: Set<String> = new Set();
-  private socket: Socket | null = null; // Initialize with null
-
+  private sessions: Map<String, Socket> = new Map();
   private static instance: SocketEventHandler;
   static getInstance() {
     if (!this.instance) {
@@ -18,32 +15,29 @@ export default class SocketEventHandler {
     return this.instance;
   }
 
-  private constructor() {
-    this.sessionUser = generateUsername("-", 2); // e.g blossom-logistical74
-  }
+  private constructor() {}
 
-  sendTagToDatabase(tag: Array<Stroke>, imageFile: ImageFile | undefined) {
+  sendTagToDatabase(
+    tag: Array<Stroke>,
+    artist: string,
+    imageFile: ImageFile | undefined
+  ) {
     const db = MongoDatabase.getInstance();
-    db.createCanvasPreview(tag, this.sessionUser, imageFile);
+    db.createCanvasPreview(tag, artist, imageFile);
   }
 
   setup(io: Server) {
     io.on("connection", async (socket: Socket) => {
       //generate a new user per client session
-      this.socket = socket;
-      this.sessionUser = generateUsername("-", 2);
-      console.log(`${this.sessionUser} has successfully connected`);
-      this.sessions.add(this.sessionUser);
-
-      // session user should update each connection
-
-      //Send amount of # of clients connected to the frontend
+      this.sessions.set(socket.id, socket);
+      console.log("socketID: " + socket.id);
       io.emit("client-connected", this.sessions.size);
+      const sessionUsername = generateUsername("-", 2);
 
       //Load all graffiti tags saved in canvas
       const mdb = MongoDatabase.getInstance();
       const tagPreviews: ImagePreview[] = await mdb.getTagPreviews();
-      socket.emit("boot-up", this.sessionUser, this.sessions.size, tagPreviews);
+      socket.emit("boot-up", sessionUsername, this.sessions.size, tagPreviews);
 
       //Handles real-time paint strokes
       this.strokeListener(socket);
@@ -57,15 +51,10 @@ export default class SocketEventHandler {
       //Handles real-time chat log
       this.chatListener(socket);
 
-      //update session username
-      this.updateUsername(socket);
-
       socket.on("disconnect", (data: DisconnectReason) => {
-        console.log(this.sessionUser + " has disconnected");
-        this.sessions.delete(this.sessionUser);
+        this.sessions.delete(socket.id);
         io.emit("client-disconnected", this.sessions.size);
       });
-
       socket.on("error", (error: Error) => {
         console.log(error);
       });
@@ -83,15 +72,17 @@ export default class SocketEventHandler {
       imageFile: imageFile,
       artists: username,
     };
-    console.log("server socket: " + this.socket);
-    if (this.socket) {
+
+    const currentSockets = Array.from(this.sessions.values());
+    const firstConnectedSocket = currentSockets[0];
+    if (firstConnectedSocket) {
       switch (query) {
         case QueryType.create:
-          this.socket.emit("preview-loaded", imagePreview);
+          firstConnectedSocket.broadcast.emit("preview-loaded", imagePreview);
           console.log("loaded notified");
           break;
         case QueryType.update:
-          this.socket.emit("preview-updated", imagePreview);
+          firstConnectedSocket.broadcast.emit("preview-updated", imagePreview);
           console.log("update notified");
           break;
       }
@@ -101,20 +92,14 @@ export default class SocketEventHandler {
   private generateUser(socket: Socket) {
     socket.on("generate-user", () => {
       const newUser = generateUsername("-", 2);
-      this.sessionUser = newUser;
+      // this.sessionUser = newUser;
       socket.emit("generate-user", newUser);
     });
   }
 
-  private updateUsername(socket: Socket) {
-    socket.on("update-user", (newUser: string) => {
-      this.sessionUser = newUser;
-    });
-  }
-
   private chatListener(socket: Socket) {
-    socket.on("chat", (message: string) => {
-      socket.broadcast.emit("chat", message, this.sessionUser);
+    socket.on("chat", (message: string, artist: string) => {
+      socket.broadcast.emit("chat", message, artist);
     });
   }
 

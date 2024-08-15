@@ -70,6 +70,7 @@ class SocketIOServer {
       console.log(method);
       const tag: Array<Stroke> = JSON.parse(req.body.tag);
       const img: Express.Multer.File | undefined = req.file;
+      const artist: string = JSON.parse(req.body.artist);
 
       if (img) {
         const imageFile: ImageFile = {
@@ -80,7 +81,11 @@ class SocketIOServer {
         };
 
         if (method == "post") {
-          SocketEventHandler.getInstance().sendTagToDatabase(tag, imageFile);
+          SocketEventHandler.getInstance().sendTagToDatabase(
+            tag,
+            artist,
+            imageFile
+          );
         } else {
           MongoDatabase.getInstance().updateTag(canvasId, tag, imageFile);
         }

@@ -24,7 +24,7 @@ export default class SocketEventHandler {
 
   sendTagToDatabase(tag: Array<Stroke>, imageFile: ImageFile | undefined) {
     const db = MongoDatabase.getInstance();
-    db.createTag(tag, this.sessionUser, imageFile);
+    db.createCanvasPreview(tag, this.sessionUser, imageFile);
   }
 
   setup(io: Server) {
@@ -32,7 +32,7 @@ export default class SocketEventHandler {
       //generate a new user per client session
       this.socket = socket;
       this.sessionUser = generateUsername("-", 2);
-      console.log(` ${this.sessionUser} has successfully connected`);
+      console.log(`${this.sessionUser} has successfully connected`);
       this.sessions.add(this.sessionUser);
 
       // session user should update each connection
@@ -75,11 +75,13 @@ export default class SocketEventHandler {
   async notifyPreviewLoaded(
     id: string,
     imageFile: ImageFile,
+    username: string[] | null,
     query: QueryType
   ) {
     const imagePreview: ImagePreview = {
       id: id,
       imageFile: imageFile,
+      artists: username,
     };
     console.log("server socket: " + this.socket);
     if (this.socket) {

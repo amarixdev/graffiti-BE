@@ -35,18 +35,24 @@ export default class MongoDatabase {
       })
       .finally(async () => {
         const socketHandler = SocketEventHandler.getInstance();
-        socketHandler.notifyPreviewLoaded(id, imageFile, QueryType.update);
+        socketHandler.notifyPreviewLoaded(
+          id,
+          imageFile,
+          null,
+          QueryType.update
+        );
         console.log(`tag ${id} successfully updated`);
         await this.prisma.$disconnect();
       });
   }
 
-  async createTag(
+  async createCanvasPreview(
     tag: Array<Stroke>,
     user: string,
     imageFile: ImageFile | undefined
   ): Promise<void> {
     if (imageFile) {
+      console.log("USER: " + user);
       const id = new ObjectId().toString();
       console.log("attempting to create tag....");
       await this.prisma.tag
@@ -71,7 +77,12 @@ export default class MongoDatabase {
           const socketHandler = SocketEventHandler.getInstance();
 
           //notify client when tag has been created; sends the canvas preview
-          socketHandler.notifyPreviewLoaded(id, imageFile, QueryType.create);
+          socketHandler.notifyPreviewLoaded(
+            id,
+            imageFile,
+            [user],
+            QueryType.create
+          );
           await this.prisma.$disconnect();
         });
     }
@@ -83,6 +94,7 @@ export default class MongoDatabase {
         select: {
           id: true,
           imageFile: true,
+          artists: true,
         },
       })
       .catch(async (e) => {
@@ -94,9 +106,14 @@ export default class MongoDatabase {
       });
 
     const previews = imgPreviews.map((data) => {
+      const usernames: string[] = data.artists.map((artist) => {
+        return artist.name;
+      });
+
       const preview: ImagePreview = {
         id: data.id,
         imageFile: data.imageFile,
+        artists: usernames,
       };
       return preview;
     });
@@ -123,6 +140,27 @@ export default class MongoDatabase {
       });
 
     return tag;
+  }
+
+  async getArtist(id: string) {
+    const tagArtistIDs = await this.prisma.tag.findFirst({
+      where: {
+        id: id,
+      },
+      select: {
+        artistIds: true,
+      },
+    });
+
+    const artistNames = await this.prisma.artist.findMany({
+      where: {
+        id: {
+          in: tagArtistIDs?.artistIds,
+        },
+      },
+    });
+
+    console.log(artistNames);
   }
 
   //Dev only

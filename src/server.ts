@@ -70,6 +70,7 @@ class SocketIOServer {
       console.log(method);
       const tag: Array<Stroke> = JSON.parse(req.body.tag);
       const img: Express.Multer.File | undefined = req.file;
+
       if (img) {
         const imageFile: ImageFile = {
           filename: UUID(),

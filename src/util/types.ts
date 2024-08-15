@@ -4,8 +4,9 @@ export type BrushStroke = {
 };
 
 export type ImagePreview = {
-  id: String;
+  id: string;
   imageFile: ImageFile;
+  artists: string[] | null;
 };
 
 export type ImageFile = {

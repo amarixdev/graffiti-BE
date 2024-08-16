@@ -8,6 +8,8 @@ import { QueryType } from "./util/enums.js";
 export default class SocketEventHandler {
   private sessions: Map<String, Socket> = new Map();
   private static instance: SocketEventHandler;
+  private io: Server | null = null;
+
   static getInstance() {
     if (!this.instance) {
       this.instance = new SocketEventHandler();
@@ -27,6 +29,7 @@ export default class SocketEventHandler {
   }
 
   setup(io: Server) {
+    this.io = io;
     io.on("connection", async (socket: Socket) => {
       //generate a new user per client session
       this.sessions.set(socket.id, socket);
@@ -45,7 +48,7 @@ export default class SocketEventHandler {
       //generate a new username
       this.generateUser(socket);
 
-      //Resets the database
+      //Resets the database [DEV ONLY]
       this.clearListener(socket);
 
       //Handles real-time chat log
@@ -72,21 +75,29 @@ export default class SocketEventHandler {
       imageFile: imageFile,
       artists: username,
     };
+    const tryEmit = () => {
+      if (this.io) {
+        console.log("attempting to broadcast...");
+        switch (query) {
+          case QueryType.create:
+            try {
+              this.io.emit("preview-loaded", imagePreview);
+            } catch (error) {
+              console.error("Error emitting socket event [load]: ", error);
+            }
 
-    const currentSockets = Array.from(this.sessions.values());
-    const firstConnectedSocket = currentSockets[0];
-    if (firstConnectedSocket) {
-      switch (query) {
-        case QueryType.create:
-          firstConnectedSocket.broadcast.emit("preview-loaded", imagePreview);
-          console.log("loaded notified");
-          break;
-        case QueryType.update:
-          firstConnectedSocket.broadcast.emit("preview-updated", imagePreview);
-          console.log("update notified");
-          break;
+            break;
+          case QueryType.update:
+            try {
+              this.io.emit("preview-updated", imagePreview);
+            } catch (error) {
+              console.error("Error emitting socket event [update]: ", error);
+            }
+            break;
+        }
       }
-    }
+    };
+    tryEmit();
   }
 
   private generateUser(socket: Socket) {

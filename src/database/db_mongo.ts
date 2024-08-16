@@ -25,14 +25,9 @@ export default class MongoDatabase {
   ) {
     console.log("attempting to update tag....");
     //adds to artist to tag
-    await this.ensureArtistTagConnection(username, tagID);
+    await this.syncArtistTagConnection(username, tagID);
     const artistNames = await this.fetchArtistsNamesFromTag(tagID);
-    await this.updateTagWithNewStrokes(
-      tagID,
-      strokes,
-      imageFile,
-      artistNames
-    ).finally(() =>
+    await this.updateTagWithNewStrokes(tagID, strokes, imageFile).finally(() =>
       this.notifyOnCompletion(artistNames, tagID, imageFile, QueryType.update)
     );
   }
@@ -155,7 +150,7 @@ export default class MongoDatabase {
     await this.prisma.tag.deleteMany();
   }
 
-  private async ensureArtistTagConnection(
+  private async syncArtistTagConnection(
     username: string,
     tagID: string
   ): Promise<void> {
@@ -190,8 +185,7 @@ export default class MongoDatabase {
   private async updateTagWithNewStrokes(
     tagID: string,
     strokes: Array<Stroke>,
-    imageFile: ImageFile,
-    artistNames: string[] | undefined
+    imageFile: ImageFile
   ) {
     await this.prisma.tag
       .update({
@@ -238,5 +232,4 @@ export default class MongoDatabase {
     console.log(`tag ${tagID} successfully updated`);
     await this.prisma.$disconnect();
   }
-
 }
